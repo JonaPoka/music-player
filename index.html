@@ -19,23 +19,19 @@
             align-items: center;
             min-height: 100vh;
             padding: 20px;
-            overflow: hidden;
         }
 
         .player-container {
             background: linear-gradient(145deg, #3e2723, #4e342e);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 
-                        0 0 40px rgba(141, 110, 99, 0.15) inset;
+            border-radius: 6px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 
+                        0 0 12px rgba(141, 110, 99, 0.15) inset;
             width: 100%;
-            max-width: 450px;
-            aspect-ratio: 0.85;
-            padding: 8.8%;
+            max-width: 135px;
+            padding: 12px;
             color: #efebe9;
             position: relative;
             overflow: hidden;
-            /* Use container query units for all internal sizing */
-            container-type: size;
         }
 
         .player-container::before {
@@ -51,10 +47,9 @@
 
         .vinyl-container {
             position: relative;
-            width: 100%;
-            aspect-ratio: 1;
-            max-width: 280px;
-            margin: 0 auto 6.6%;
+            width: 84px;
+            height: 84px;
+            margin: 0 auto 9px;
         }
 
         /* Turntable base */
@@ -64,8 +59,8 @@
             height: 100%;
             background: radial-gradient(circle, #2c1810 0%, #1a0f0a 100%);
             border-radius: 50%;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8),
-                        inset 0 2px 10px rgba(255, 255, 255, 0.03);
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.8),
+                        inset 0 0.6px 3px rgba(255, 255, 255, 0.03);
         }
 
         /* Vinyl record */
@@ -112,11 +107,11 @@
             background: repeating-radial-gradient(
                 circle,
                 #1a1a1a 0px,
-                #1a1a1a 1px,
-                #2a2a2a 1px,
-                #2a2a2a 2px
+                #1a1a1a 0.3px,
+                #2a2a2a 0.3px,
+                #2a2a2a 0.6px
             );
-            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
         }
 
         /* Skip zone (right side of vinyl) - STATIC, doesn't spin */
@@ -126,7 +121,7 @@
             top: 0;
             width: 50%;
             height: 100%;
-            border-radius: 0 50% 50% 0;
+            border-radius: 0 42px 42px 0;
             cursor: pointer;
             z-index: 10;
             transition: background 0.3s;
@@ -146,13 +141,14 @@
             height: 45%;
             border-radius: 50%;
             background: linear-gradient(145deg, #8d6e63, #6d4c41);
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5),
-                        inset 0 2px 10px rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.5),
+                        inset 0 0.6px 3px rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
             pointer-events: none;
+            font-size: 10px;
         }
 
         .vinyl-label canvas,
@@ -166,11 +162,11 @@
         .vinyl-label::after {
             content: '';
             position: absolute;
-            width: 15px;
-            height: 15px;
+            width: 4.5px;
+            height: 4.5px;
             background: #1a1a1a;
             border-radius: 50%;
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8);
+            box-shadow: inset 0 0.6px 1.5px rgba(0, 0, 0, 0.8);
             z-index: 10;
         }
 
@@ -179,13 +175,13 @@
             position: absolute;
             top: 15%;
             right: -10%;
-            width: 42.8%;
-            height: 2.8%;
+            width: 36px;
+            height: 2.4px;
             background: linear-gradient(90deg, #8d6e63 0%, #6d4c41 100%);
-            border-radius: 14%;
+            border-radius: 1.2px;
             transform-origin: right center;
             transform: rotate(-90deg);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 1.2px 4.5px rgba(0, 0, 0, 0.6);
             transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 20;
             cursor: pointer;
@@ -202,36 +198,36 @@
         .tone-arm::before {
             content: '';
             position: absolute;
-            left: -12.5%;
+            left: -4.5px;
             top: 50%;
             transform: translateY(-50%);
-            width: 16.6%;
-            height: 250%;
+            width: 6px;
+            height: 6px;
             background: radial-gradient(circle, #8d6e63, #6d4c41);
             border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0.6px 2.4px rgba(0, 0, 0, 0.5);
         }
 
         .tone-arm::after {
             content: '';
             position: absolute;
-            right: -4.1%;
+            right: -1.5px;
             top: 50%;
             transform: translateY(-50%);
-            width: 8.3%;
-            height: 125%;
+            width: 3px;
+            height: 3px;
             background: #d7ccc8;
             border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0.6px 1.5px rgba(0, 0, 0, 0.4);
         }
 
         /* Volume knob */
         .volume-knob-container {
             position: absolute;
-            bottom: 8.8%;
-            right: 8.8%;
-            width: 17.7%;
-            aspect-ratio: 1;
+            bottom: 12px;
+            right: 12px;
+            width: 24px;
+            height: 24px;
             z-index: 20;
         }
 
@@ -245,14 +241,14 @@
         .volume-knob-progress circle {
             fill: none;
             stroke: rgba(93, 64, 55, 0.3);
-            stroke-width: 4;
+            stroke-width: 1.2;
         }
 
         .volume-knob-progress .progress-ring {
             stroke: #d7ccc8;
             stroke-linecap: round;
             transition: stroke-dashoffset 0.1s ease;
-            filter: drop-shadow(0 0 5px rgba(215, 204, 200, 0.5));
+            filter: drop-shadow(0 0 1.5px rgba(215, 204, 200, 0.5));
         }
 
         .volume-knob {
@@ -260,13 +256,13 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 75%;
-            height: 75%;
+            width: 18px;
+            height: 18px;
             background: radial-gradient(circle at 30% 30%, #2a2a2a, #0a0a0a);
             border-radius: 50%;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8),
-                        inset 0 2px 5px rgba(255, 255, 255, 0.1),
-                        inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 1.2px 4.5px rgba(0, 0, 0, 0.8),
+                        inset 0 0.6px 1.5px rgba(255, 255, 255, 0.1),
+                        inset 0 -0.6px 1.5px rgba(0, 0, 0, 0.5);
             cursor: grab;
             transition: transform 0.1s;
             user-select: none;
@@ -280,14 +276,14 @@
         .volume-knob::before {
             content: '';
             position: absolute;
-            top: 13.3%;
+            top: 2.4px;
             left: 50%;
             transform: translateX(-50%);
-            width: 5%;
-            height: 25%;
+            width: 0.9px;
+            height: 4.5px;
             background: #d7ccc8;
-            border-radius: 33%;
-            box-shadow: 0 0 5px rgba(215, 204, 200, 0.5);
+            border-radius: 0.6px;
+            box-shadow: 0 0 1.5px rgba(215, 204, 200, 0.5);
         }
 
         .volume-knob::after {
@@ -296,38 +292,38 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 33.3%;
-            height: 33.3%;
+            width: 6px;
+            height: 6px;
             background: radial-gradient(circle, #1a1a1a, #0a0a0a);
             border-radius: 50%;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+            box-shadow: inset 0 0.3px 0.9px rgba(0, 0, 0, 0.8);
         }
 
         /* Now playing info */
         .now-playing {
             text-align: center;
-            margin-bottom: 4.4%;
-            min-height: 17.7%;
+            margin-bottom: 6px;
+            min-height: 24px;
         }
 
         .now-playing-label {
-            font-size: clamp(8px, 2.6vw, 12px);
+            font-size: 3.6px;
             color: #a1887f;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
-            margin-bottom: 1.7%;
+            letter-spacing: 0.6px;
+            margin-bottom: 2.4px;
         }
 
         .now-playing-title {
-            font-size: clamp(14px, 4.8vw, 22px);
+            font-size: 6.6px;
             color: #efebe9;
             font-style: italic;
-            margin-bottom: 1.3%;
+            margin-bottom: 1.8px;
             font-weight: 400;
         }
 
         .now-playing-artist {
-            font-size: clamp(11px, 3.3vw, 15px);
+            font-size: 4.5px;
             color: #bcaaa4;
             font-weight: 300;
         }
@@ -335,57 +331,57 @@
         /* Up next info - reduced spacing */
         .up-next {
             background: rgba(62, 39, 35, 0.5);
-            border-radius: 12px;
-            padding: 3.3% 4.4%;
+            border-radius: 3.6px;
+            padding: 4.5px 6px;
             margin-bottom: 0;
-            border: 1px solid rgba(161, 136, 127, 0.2);
-            min-height: 13.3%;
+            border: 0.3px solid rgba(161, 136, 127, 0.2);
+            min-height: 18px;
         }
 
         .up-next-label {
-            font-size: clamp(7px, 2.4vw, 11px);
+            font-size: 3.3px;
             color: #8d6e63;
             text-transform: uppercase;
-            letter-spacing: 0.13em;
-            margin-bottom: 1.3%;
+            letter-spacing: 0.45px;
+            margin-bottom: 1.8px;
         }
 
         .up-next-info {
-            font-size: clamp(10px, 3vw, 14px);
+            font-size: 4.2px;
             color: #d7ccc8;
             font-style: italic;
         }
 
         .up-next-artist {
-            font-size: clamp(9px, 2.6vw, 12px);
+            font-size: 3.6px;
             color: #a1887f;
-            margin-top: 0.6%;
+            margin-top: 0.9px;
         }
 
         .loading {
             text-align: center;
-            padding: 4.4%;
+            padding: 6px;
             color: #bcaaa4;
-            font-size: clamp(11px, 3.3vw, 15px);
+            font-size: 4.5px;
             font-style: italic;
         }
 
         .error {
             text-align: center;
-            padding: 4.4%;
+            padding: 6px;
             color: #ff8a65;
-            font-size: clamp(10px, 3vw, 14px);
+            font-size: 4.2px;
         }
 
         /* Shuffle indicator */
         .shuffle-indicator {
             position: absolute;
-            top: 4.4%;
-            right: 4.4%;
-            font-size: clamp(7px, 2.4vw, 11px);
+            top: 6px;
+            right: 6px;
+            font-size: 3.3px;
             color: #8d6e63;
             text-transform: uppercase;
-            letter-spacing: 0.09em;
+            letter-spacing: 0.3px;
             opacity: 0.7;
         }
 
@@ -395,17 +391,17 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(3px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         /* Volume level indicator */
         .volume-level {
             position: absolute;
-            bottom: -31.2%;
+            bottom: -7.5px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: clamp(7px, 2vw, 10px);
+            font-size: 3px;
             color: #a1887f;
             opacity: 0;
             transition: opacity 0.3s;
@@ -415,25 +411,6 @@
         .volume-knob-container:hover .volume-level,
         .volume-knob-container.active .volume-level {
             opacity: 1;
-        }
-
-        /* Responsive scaling for very small screens */
-        @media (max-width: 400px) or (max-height: 500px) {
-            body {
-                padding: 10px;
-            }
-            
-            .player-container {
-                max-width: 100%;
-                border-radius: 15px;
-            }
-        }
-
-        /* Ensure proper scaling on larger screens */
-        @media (min-width: 800px) {
-            .player-container {
-                max-width: 450px;
-            }
         }
     </style>
 </head>
@@ -466,11 +443,11 @@
         </div>
 
         <div class="volume-knob-container" id="volumeKnobContainer">
-            <svg class="volume-knob-progress" width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="xMidYMid meet">
-                <circle cx="40" cy="40" r="36" />
-                <circle class="progress-ring" cx="40" cy="40" r="36" 
-                        stroke-dasharray="226.19" 
-                        stroke-dashoffset="67.86" 
+            <svg class="volume-knob-progress" width="24" height="24">
+                <circle cx="12" cy="12" r="10.8" />
+                <circle class="progress-ring" cx="12" cy="12" r="10.8" 
+                        stroke-dasharray="67.86" 
+                        stroke-dashoffset="20.36" 
                         id="volumeProgressRing"/>
             </svg>
             <div class="volume-knob" id="volumeKnob"></div>
@@ -541,7 +518,7 @@
             const angle = -135 + (volume / 100) * 270;
             volumeKnob.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
             
-            const circumference = 2 * Math.PI * 36;
+            const circumference = 2 * Math.PI * 10.8;
             const progressLength = (volume / 100) * (circumference * 0.75);
             const offset = circumference - progressLength;
             volumeProgressRing.style.strokeDashoffset = offset;
