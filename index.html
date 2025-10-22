@@ -77,7 +77,7 @@
             z-index: 1;
         }
 
-        .album-art img ~ ::before {
+        .album-art.has-image::before {
             display: none;
         }
 
@@ -349,6 +349,7 @@
             text-align: center;
             padding: 20px;
             color: #ff8a65;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -400,7 +401,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
     <script>
-        // Audio element
         const audio = new Audio();
         let songs = [];
         let currentSongIndex = 0;
@@ -422,40 +422,56 @@
         const volumeSlider = document.getElementById('volumeSlider');
         const volumeFill = document.getElementById('volumeFill');
 
-        // Extract metadata from audio file
-        async function extractMetadata(file) {
-            return new Promise((resolve) => {
-                jsmediatags.read(file, {
-                    onSuccess: function(tag) {
-                        const tags = tag.tags;
-                        const metadata = {
-                            title: tags.title || file.split('/').pop().replace(/\.[^/.]+$/, ""),
-                            artist: tags.artist || 'Unknown Artist',
-                            album: tags.album || '',
-                            duration: 0,
-                            picture: null
-                        };
+        // Extract metadata from audio file URL - FIXED VERSION
+        async function extractMetadata(fileUrl) {
+            return new Promise(async (resolve) => {
+                try {
+                    // Fetch the file as a blob first
+                    const response = await fetch(fileUrl);
+                    const blob = await response.blob();
+                    
+                    jsmediatags.read(blob, {
+                        onSuccess: function(tag) {
+                            const tags = tag.tags;
+                            const metadata = {
+                                title: tags.title || fileUrl.split('/').pop().replace(/\.[^/.]+$/, ""),
+                                artist: tags.artist || 'Unknown Artist',
+                                album: tags.album || '',
+                                duration: 0,
+                                picture: null
+                            };
 
-                        // Extract album art
-                        if (tags.picture) {
-                            const picture = tags.picture;
-                            const base64String = picture.data.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
-                            metadata.picture = `data:${picture.format};base64,${btoa(base64String)}`;
+                            // Extract album art
+                            if (tags.picture) {
+                                const picture = tags.picture;
+                                const base64String = picture.data.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+                                metadata.picture = `data:${picture.format};base64,${btoa(base64String)}`;
+                            }
+
+                            resolve(metadata);
+                        },
+                        onError: function(error) {
+                            console.log('Error reading metadata for', fileUrl, ':', error);
+                            // Fallback to filename
+                            resolve({
+                                title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
+                                artist: 'Unknown Artist',
+                                album: '',
+                                duration: 0,
+                                picture: null
+                            });
                         }
-
-                        resolve(metadata);
-                    },
-                    onError: function(error) {
-                        console.log('Error reading metadata:', error);
-                        resolve({
-                            title: file.split('/').pop().replace(/\.[^/.]+$/, ""),
-                            artist: 'Unknown Artist',
-                            album: '',
-                            duration: 0,
-                            picture: null
-                        });
-                    }
-                });
+                    });
+                } catch (error) {
+                    console.error('Error fetching file:', error);
+                    resolve({
+                        title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
+                        artist: 'Unknown Artist',
+                        album: '',
+                        duration: 0,
+                        picture: null
+                    });
+                }
             });
         }
 
@@ -467,34 +483,42 @@
                 
                 const data = await response.json();
                 
+                if (!data.songs || data.songs.length === 0) {
+                    throw new Error('No songs found in songs.json');
+                }
+                
                 // Load metadata for each song
                 for (const songFile of data.songs) {
-                    const metadata = await extractMetadata(`songs/${songFile}`);
+                    const songPath = `songs/${encodeURIComponent(songFile)}`;
+                    const metadata = await extractMetadata(songPath);
                     
                     // Get duration
-                    const tempAudio = new Audio(`songs/${songFile}`);
+                    const tempAudio = new Audio(songPath);
                     await new Promise((resolve) => {
                         tempAudio.addEventListener('loadedmetadata', () => {
                             metadata.duration = tempAudio.duration;
                             resolve();
                         });
-                        tempAudio.addEventListener('error', resolve);
+                        tempAudio.addEventListener('error', () => {
+                            console.error('Error loading audio:', songFile);
+                            resolve();
+                        });
                     });
                     
                     songs.push({
-                        file: `songs/${songFile}`,
+                        file: songPath,
                         ...metadata
                     });
                 }
                 
                 if (songs.length === 0) {
-                    throw new Error('No songs found');
+                    throw new Error('No songs could be loaded');
                 }
                 
                 init();
             } catch (error) {
                 console.error('Error loading songs:', error);
-                playlist.innerHTML = '<div class="error">Please create a songs.json file with your song list. See instructions.</div>';
+                playlist.innerHTML = `<div class="error">Error: ${error.message}<br><br>Make sure songs.json exists and contains valid song filenames.</div>`;
             }
         }
 
@@ -549,11 +573,13 @@
             
             // Update album art
             albumArt.innerHTML = '';
+            albumArt.classList.remove('has-image');
             if (song.picture) {
                 const img = document.createElement('img');
                 img.src = song.picture;
                 img.alt = 'Album Art';
                 albumArt.appendChild(img);
+                albumArt.classList.add('has-image');
             } else {
                 albumArt.innerHTML = '<div class="song-number"></div>';
             }
