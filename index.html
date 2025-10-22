@@ -62,11 +62,10 @@
             overflow: hidden;
         }
 
-        .album-art img {
+        .album-art canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            object-position: center center;
             border-radius: 15px;
         }
 
@@ -481,6 +480,104 @@
         const volumeSlider = document.getElementById('volumeSlider');
         const volumeFill = document.getElementById('volumeFill');
 
+        // Crop transparent pixels from image
+        function cropTransparentPixels(imageSrc) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Draw the original image to get pixel data
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    let top = 0, bottom = canvas.height, left = 0, right = canvas.width;
+                    
+                    // Find top boundary (first non-transparent row)
+                    rowLoop: for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                top = y;
+                                break rowLoop;
+                            }
+                        }
+                    }
+                    
+                    // Find bottom boundary (last non-transparent row)
+                    rowLoopBottom: for (let y = canvas.height - 1; y >= 0; y--) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                bottom = y + 1;
+                                break rowLoopBottom;
+                            }
+                        }
+                    }
+                    
+                    // Find left boundary (first non-transparent column)
+                    colLoop: for (let x = 0; x < canvas.width; x++) {
+                        for (let y = 0; y < canvas.height; y++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                left = x;
+                                break colLoop;
+                            }
+                        }
+                    }
+                    
+                    // Find right boundary (last non-transparent column)
+                    colLoopRight: for (let x = canvas.width - 1; x >= 0; x--) {
+                        for (let y = 0; y < canvas.height; y++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                right = x + 1;
+                                break colLoopRight;
+                            }
+                        }
+                    }
+                    
+                    const croppedWidth = right - left;
+                    const croppedHeight = bottom - top;
+                    
+                    // Create final canvas with cropped dimensions
+                    const finalCanvas = document.createElement('canvas');
+                    const finalCtx = finalCanvas.getContext('2d');
+                    
+                    // Make it square based on the cropped height
+                    const size = croppedHeight;
+                    finalCanvas.width = size;
+                    finalCanvas.height = size;
+                    
+                    // Calculate horizontal centering for the crop
+                    const horizontalCenter = left + (croppedWidth / 2);
+                    const cropLeft = Math.max(0, horizontalCenter - (size / 2));
+                    
+                    // Draw the cropped and centered portion
+                    finalCtx.drawImage(
+                        img,
+                        cropLeft, top, size, size,  // source rectangle
+                        0, 0, size, size             // destination rectangle
+                    );
+                    
+                    resolve(finalCanvas);
+                };
+                
+                img.onerror = function() {
+                    resolve(null);
+                };
+                
+                img.src = imageSrc;
+            });
+        }
+
         // Extract metadata from audio file URL
         async function extractMetadata(fileUrl) {
             return new Promise(async (resolve) => {
@@ -619,7 +716,7 @@
         }
 
         // Load song
-        function loadSong(index) {
+        async function loadSong(index) {
             currentSongIndex = index;
             const song = songs[index];
             
@@ -628,7 +725,7 @@
             songArtist.textContent = song.artist;
             songAlbum.textContent = song.album;
             
-            // Update album art - FIXED to properly update image
+            // Update album art with transparent pixel cropping
             albumArt.classList.remove('has-image');
             
             // Clear previous content
@@ -637,14 +734,18 @@
             }
             
             if (song.picture) {
-                const img = document.createElement('img');
-                img.src = song.picture;
-                img.alt = 'Album Art';
-                // Force reload by adding timestamp
-                img.onload = function() {
+                // Crop transparent pixels and create canvas
+                const croppedCanvas = await cropTransparentPixels(song.picture);
+                
+                if (croppedCanvas) {
+                    albumArt.appendChild(croppedCanvas);
                     albumArt.classList.add('has-image');
-                };
-                albumArt.appendChild(img);
+                } else {
+                    // Fallback if cropping fails
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'song-number';
+                    albumArt.appendChild(placeholder);
+                }
             } else {
                 const placeholder = document.createElement('div');
                 placeholder.className = 'song-number';
