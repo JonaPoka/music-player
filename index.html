@@ -69,17 +69,30 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            transition: transform 0.3s ease;
             cursor: pointer;
+            animation: none;
         }
 
         .vinyl.spinning {
             animation: spin 3s linear infinite;
         }
 
+        .vinyl.slowing-down {
+            animation: slowDown 2s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+        }
+
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
+        }
+
+        @keyframes slowDown {
+            0% { 
+                animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1);
+            }
+            100% { 
+                transform: rotate(720deg);
+            }
         }
 
         /* Vinyl grooves */
@@ -455,7 +468,6 @@
         let isPlaying = false;
         let currentVolume = 70;
         let isDraggingKnob = false;
-        let knobStartY = 0;
         let lastTickVolume = 70;
 
         // DOM elements
@@ -505,23 +517,18 @@
             const angle = -135 + (volume / 100) * 270;
             volumeKnob.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
             
-            // Fixed: Progress ring now goes from bottom-left to bottom-right
             const circumference = 2 * Math.PI * 36;
-            const progressLength = (volume / 100) * (circumference * 0.75); // 270 degrees = 75% of circle
+            const progressLength = (volume / 100) * (circumference * 0.75);
             const offset = circumference - progressLength;
             volumeProgressRing.style.strokeDashoffset = offset;
             
             volumeLevel.textContent = `${Math.round(volume)}%`;
         }
 
-        // Volume knob interaction - NOW USING VERTICAL MOUSE MOVEMENT
+        // Volume knob interaction - CIRCULAR DRAGGING
         function startKnobDrag(e) {
             e.preventDefault();
             isDraggingKnob = true;
-            
-            // Get the Y position from mouse or touch
-            knobStartY = e.clientY || (e.touches && e.touches[0].clientY);
-            
             volumeKnobContainer.classList.add('active');
             document.body.style.cursor = 'grabbing';
         }
@@ -530,29 +537,45 @@
             if (!isDraggingKnob) return;
             e.preventDefault();
             
-            // Get current Y position
+            // Get knob center position
+            const rect = volumeKnob.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Get mouse/touch position
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
             const clientY = e.clientY || (e.touches && e.touches[0].clientY);
             
-            // Calculate vertical movement (negative = up, positive = down)
-            const yDiff = knobStartY - clientY;
+            // Calculate angle from center to mouse
+            const dx = clientX - centerX;
+            const dy = clientY - centerY;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
             
-            // Update volume based on vertical movement
-            // Moving up increases volume, moving down decreases it
-            let newVolume = currentVolume + (yDiff * 0.5);
-            newVolume = Math.max(0, Math.min(100, newVolume));
+            // Adjust angle to match our knob's range (-135° to 135°)
+            // atan2 gives us -180 to 180, we need to map this to our 0-100 volume range
+            angle = angle + 90; // Rotate reference frame so top is 0°
+            if (angle < 0) angle += 360;
             
-            // Play click sound every 5% change
-            if (Math.abs(newVolume - lastTickVolume) >= 5) {
-                playClickSound();
-                lastTickVolume = Math.round(newVolume / 5) * 5;
+            // Map angle to volume (0-100)
+            // Our knob goes from 225° (-135° adjusted) to 45° (135° adjusted) = 270° total range
+            let normalizedAngle = angle - 225; // Start from bottom-left
+            if (normalizedAngle < 0) normalizedAngle += 360;
+            
+            // Only update if within valid range
+            if (normalizedAngle <= 270) {
+                let newVolume = (normalizedAngle / 270) * 100;
+                newVolume = Math.max(0, Math.min(100, newVolume));
+                
+                // Play click sound every 5% change
+                if (Math.abs(newVolume - lastTickVolume) >= 5) {
+                    playClickSound();
+                    lastTickVolume = Math.round(newVolume / 5) * 5;
+                }
+                
+                currentVolume = newVolume;
+                audio.volume = newVolume / 100;
+                updateVolumeKnob(newVolume);
             }
-            
-            currentVolume = newVolume;
-            audio.volume = newVolume / 100;
-            updateVolumeKnob(newVolume);
-            
-            // Update start position for next movement
-            knobStartY = clientY;
         }
 
         function stopKnobDrag() {
@@ -825,18 +848,27 @@
             }
         }
 
-        // Toggle play/pause
+        // Toggle play/pause with gradual vinyl slowdown
         function togglePlayPause(e) {
             e.stopPropagation();
             if (isPlaying) {
+                // Pause with slowdown effect
                 audio.pause();
                 vinyl.classList.remove('spinning');
+                vinyl.classList.add('slowing-down');
                 toneArm.classList.remove('playing');
+                
+                // Remove slowing-down class after animation completes
+                setTimeout(() => {
+                    vinyl.classList.remove('slowing-down');
+                }, 2000);
             } else {
+                // Play
                 if (!audio.src) {
                     loadSong(0);
                 }
                 audio.play();
+                vinyl.classList.remove('slowing-down');
                 vinyl.classList.add('spinning');
                 toneArm.classList.add('playing');
             }
