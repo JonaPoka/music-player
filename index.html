@@ -101,7 +101,7 @@
             box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
         }
 
-        /* Skip zone (right side of vinyl) */
+        /* Skip zone (right side of vinyl) - STATIC, doesn't spin */
         .vinyl-skip-zone {
             position: absolute;
             right: 0;
@@ -110,7 +110,7 @@
             height: 100%;
             border-radius: 0 140px 140px 0;
             cursor: pointer;
-            z-index: 5;
+            z-index: 15;
             transition: background 0.3s;
         }
 
@@ -214,13 +214,14 @@
             right: 40px;
             width: 80px;
             height: 80px;
+            z-index: 20;
         }
 
         .volume-knob-progress {
             position: absolute;
             width: 100%;
             height: 100%;
-            transform: rotate(-135deg);
+            transform: rotate(135deg);
         }
 
         .volume-knob-progress circle {
@@ -343,52 +344,15 @@
             margin-top: 3px;
         }
 
-        /* Progress bar */
-        .progress-container {
-            margin-bottom: 25px;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: rgba(93, 64, 55, 0.5);
-            border-radius: 3px;
-            cursor: pointer;
-            position: relative;
-            margin-bottom: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) inset;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #d7ccc8, #bcaaa4);
-            border-radius: 3px;
-            width: 0%;
-            transition: width 0.1s linear;
-            position: relative;
-            box-shadow: 0 0 10px rgba(215, 204, 200, 0.4);
-        }
-
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            right: -6px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 12px;
-            height: 12px;
-            background: #efebe9;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4),
-                        0 0 10px rgba(239, 235, 233, 0.5);
-        }
-
+        /* Time info - simplified without progress bar */
         .time-info {
             display: flex;
             justify-content: space-between;
             font-size: 12px;
             color: #a1887f;
             font-variant-numeric: tabular-nums;
+            margin-bottom: 15px;
+            padding: 0 5px;
         }
 
         .loading {
@@ -454,11 +418,12 @@
         <div class="vinyl-container">
             <div class="turntable"></div>
             <div class="vinyl" id="vinyl">
-                <div class="vinyl-skip-zone" id="skipZone"></div>
                 <div class="vinyl-label" id="vinylLabel">
                     <div class="song-number">♪</div>
                 </div>
             </div>
+            <!-- Skip zone is now OUTSIDE vinyl so it doesn't spin -->
+            <div class="vinyl-skip-zone" id="skipZone"></div>
             <div class="tone-arm" id="toneArm"></div>
         </div>
 
@@ -474,14 +439,9 @@
             <div class="up-next-artist"></div>
         </div>
 
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="time-info">
-                <span id="currentTime">0:00</span>
-                <span id="duration">0:00</span>
-            </div>
+        <div class="time-info">
+            <span id="currentTime">0:00</span>
+            <span id="duration">0:00</span>
         </div>
 
         <div class="volume-knob-container" id="volumeKnobContainer">
@@ -521,8 +481,6 @@
         const toneArm = document.getElementById('toneArm');
         const nowPlaying = document.getElementById('nowPlaying');
         const upNext = document.getElementById('upNext');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
         const currentTimeEl = document.getElementById('currentTime');
         const durationEl = document.getElementById('duration');
         const volumeKnob = document.getElementById('volumeKnob');
@@ -565,8 +523,10 @@
             const angle = -135 + (volume / 100) * 270;
             volumeKnob.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
             
+            // Fixed: Progress ring now goes from bottom-left to bottom-right
             const circumference = 2 * Math.PI * 36;
-            const offset = circumference - (volume / 100) * (circumference * 0.75);
+            const progressLength = (volume / 100) * (circumference * 0.75); // 270 degrees = 75% of circle
+            const offset = circumference - progressLength;
             volumeProgressRing.style.strokeDashoffset = offset;
             
             volumeLevel.textContent = `${Math.round(volume)}%`;
@@ -828,9 +788,8 @@
                 e.stopPropagation();
                 skipToNext();
             });
-            progressBar.addEventListener('click', seek);
             
-            audio.addEventListener('timeupdate', updateProgress);
+            audio.addEventListener('timeupdate', updateTime);
             audio.addEventListener('loadedmetadata', updateDuration);
             audio.addEventListener('ended', skipToNext);
         }
@@ -916,23 +875,14 @@
             }
         }
 
-        // Update progress
-        function updateProgress() {
-            const percent = (audio.currentTime / audio.duration) * 100;
-            progressFill.style.width = `${percent}%`;
+        // Update time display
+        function updateTime() {
             currentTimeEl.textContent = formatTime(audio.currentTime);
         }
 
         // Update duration
         function updateDuration() {
             durationEl.textContent = formatTime(audio.duration);
-        }
-
-        // Seek
-        function seek(e) {
-            const rect = progressBar.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            audio.currentTime = percent * audio.duration;
         }
 
         // Format time
