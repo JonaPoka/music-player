@@ -156,17 +156,17 @@
             z-index: 10;
         }
 
-        /* Tone arm - now rests upright and goes on top when playing */
+        /* Tone arm - rests on the right side, positioned at top-right */
         .tone-arm {
             position: absolute;
-            top: -5%;
-            right: 15%;
+            top: 15%;
+            right: -10%;
             width: 120px;
             height: 8px;
             background: linear-gradient(90deg, #8d6e63 0%, #6d4c41 100%);
             border-radius: 4px;
             transform-origin: right center;
-            transform: rotate(-90deg);
+            transform: rotate(-30deg);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
             transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 20;
@@ -178,7 +178,7 @@
         }
 
         .tone-arm.playing {
-            transform: rotate(-15deg);
+            transform: rotate(-5deg);
         }
 
         .tone-arm::before {
@@ -455,7 +455,7 @@
         let isPlaying = false;
         let currentVolume = 70;
         let isDraggingKnob = false;
-        let knobStartAngle = 0;
+        let knobStartY = 0;
         let lastTickVolume = 70;
 
         // DOM elements
@@ -514,23 +514,14 @@
             volumeLevel.textContent = `${Math.round(volume)}%`;
         }
 
-        // Volume knob interaction
-        function getAngleFromEvent(e) {
-            const rect = volumeKnobContainer.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
-            return angle;
-        }
-
+        // Volume knob interaction - NOW USING VERTICAL MOUSE MOVEMENT
         function startKnobDrag(e) {
             e.preventDefault();
             isDraggingKnob = true;
-            knobStartAngle = getAngleFromEvent(e);
+            
+            // Get the Y position from mouse or touch
+            knobStartY = e.clientY || (e.touches && e.touches[0].clientY);
+            
             volumeKnobContainer.classList.add('active');
             document.body.style.cursor = 'grabbing';
         }
@@ -539,10 +530,15 @@
             if (!isDraggingKnob) return;
             e.preventDefault();
             
-            const currentAngle = getAngleFromEvent(e);
-            const angleDiff = currentAngle - knobStartAngle;
+            // Get current Y position
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
             
-            let newVolume = currentVolume + (angleDiff * 0.5);
+            // Calculate vertical movement (negative = up, positive = down)
+            const yDiff = knobStartY - clientY;
+            
+            // Update volume based on vertical movement
+            // Moving up increases volume, moving down decreases it
+            let newVolume = currentVolume + (yDiff * 0.5);
             newVolume = Math.max(0, Math.min(100, newVolume));
             
             // Play click sound every 5% change
@@ -555,7 +551,8 @@
             audio.volume = newVolume / 100;
             updateVolumeKnob(newVolume);
             
-            knobStartAngle = currentAngle;
+            // Update start position for next movement
+            knobStartY = clientY;
         }
 
         function stopKnobDrag() {
