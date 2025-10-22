@@ -13,7 +13,7 @@
 
         body {
             font-family: Georgia, 'Times New Roman', Times, serif;
-            background: linear-gradient(135deg, #3e2723 0%, #5d4037 100%);
+            background: transparent;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -27,17 +27,32 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 
                         0 0 40px rgba(141, 110, 99, 0.1) inset;
             width: 100%;
-            max-width: 400px;
+            max-width: 900px;
             padding: 30px;
             color: #efebe9;
+            display: flex;
+            gap: 30px;
+        }
+
+        .left-section {
+            flex: 0 0 350px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
         }
 
         .album-art {
             width: 100%;
-            height: 280px;
+            height: 350px;
             background: linear-gradient(135deg, #6d4c41, #5d4037);
             border-radius: 15px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -51,7 +66,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            object-position: center;
+            object-position: center center;
             border-radius: 15px;
         }
 
@@ -79,7 +94,7 @@
 
         .song-info {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .song-title {
@@ -109,7 +124,7 @@
         }
 
         .progress-container {
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .progress-bar {
@@ -160,7 +175,7 @@
             justify-content: center;
             align-items: center;
             gap: 25px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .control-btn {
@@ -204,12 +219,80 @@
                         0 0 25px rgba(141, 110, 99, 0.3);
         }
 
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .volume-icon {
+            color: #a1887f;
+            font-size: 18px;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 4px;
+            background: rgba(93, 64, 55, 0.4);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) inset;
+        }
+
+        .volume-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #d7ccc8, #bcaaa4);
+            border-radius: 2px;
+            width: 70%;
+            pointer-events: none;
+            box-shadow: 0 0 8px rgba(215, 204, 200, 0.2);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: transparent;
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #efebe9;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: #efebe9;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .playlist-header {
+            font-size: 18px;
+            color: #d7ccc8;
+            margin-bottom: 15px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            font-style: italic;
+        }
+
         .playlist {
-            max-height: 200px;
+            flex: 1;
             overflow-y: auto;
-            margin-top: 25px;
-            padding-top: 25px;
-            border-top: 1px solid rgba(161, 136, 127, 0.2);
+            padding-right: 5px;
         }
 
         .playlist::-webkit-scrollbar {
@@ -293,70 +376,6 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .volume-control {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 25px;
-            padding-top: 25px;
-            border-top: 1px solid rgba(161, 136, 127, 0.2);
-        }
-
-        .volume-icon {
-            color: #a1887f;
-            font-size: 18px;
-        }
-
-        .volume-slider {
-            flex: 1;
-            height: 4px;
-            background: rgba(93, 64, 55, 0.4);
-            border-radius: 2px;
-            cursor: pointer;
-            position: relative;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) inset;
-        }
-
-        .volume-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #d7ccc8, #bcaaa4);
-            border-radius: 2px;
-            width: 70%;
-            pointer-events: none;
-            box-shadow: 0 0 8px rgba(215, 204, 200, 0.2);
-        }
-
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 4px;
-            background: transparent;
-            position: absolute;
-            top: 0;
-            left: 0;
-            cursor: pointer;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 12px;
-            height: 12px;
-            background: #efebe9;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
-            background: #efebe9;
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-        }
-
         .loading {
             text-align: center;
             padding: 20px;
@@ -371,45 +390,70 @@
             color: #ff8a65;
             font-size: 14px;
         }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .player-container {
+                flex-direction: column;
+                max-width: 400px;
+            }
+
+            .left-section {
+                flex: 1;
+            }
+
+            .right-section {
+                flex: 1;
+            }
+
+            .album-art {
+                height: 280px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="player-container">
-        <div class="album-art" id="albumArt">
-            <div class="song-number"></div>
-        </div>
-
-        <div class="song-info">
-            <div class="song-title" id="songTitle">Select a song</div>
-            <div class="song-artist" id="songArtist">No song playing</div>
-            <div class="song-album" id="songAlbum"></div>
-        </div>
-
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
+        <div class="left-section">
+            <div class="album-art" id="albumArt">
+                <div class="song-number"></div>
             </div>
-            <div class="time-info">
-                <span id="currentTime">0:00</span>
-                <span id="duration">0:00</span>
+
+            <div class="song-info">
+                <div class="song-title" id="songTitle">Select a song</div>
+                <div class="song-artist" id="songArtist">No song playing</div>
+                <div class="song-album" id="songAlbum"></div>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="time-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="control-btn" id="prevBtn">⏮</button>
+                <button class="control-btn play-pause" id="playPauseBtn">▶</button>
+                <button class="control-btn" id="nextBtn">⏭</button>
+            </div>
+
+            <div class="volume-control">
+                <span class="volume-icon">🔊</span>
+                <div class="volume-slider">
+                    <div class="volume-fill" id="volumeFill"></div>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="70">
+                </div>
             </div>
         </div>
 
-        <div class="controls">
-            <button class="control-btn" id="prevBtn">⏮</button>
-            <button class="control-btn play-pause" id="playPauseBtn">▶</button>
-            <button class="control-btn" id="nextBtn">⏭</button>
-        </div>
-
-        <div class="playlist" id="playlist">
-            <div class="loading">Loading songs...</div>
-        </div>
-
-        <div class="volume-control">
-            <span class="volume-icon">🔊</span>
-            <div class="volume-slider">
-                <div class="volume-fill" id="volumeFill"></div>
-                <input type="range" id="volumeSlider" min="0" max="100" value="70">
+        <div class="right-section">
+            <div class="playlist-header">Playlist</div>
+            <div class="playlist" id="playlist">
+                <div class="loading">Loading songs...</div>
             </div>
         </div>
     </div>
@@ -584,19 +628,27 @@
             songArtist.textContent = song.artist;
             songAlbum.textContent = song.album;
             
-            // Update album art with proper cropping
-            albumArt.innerHTML = '';
+            // Update album art - FIXED to properly update image
             albumArt.classList.remove('has-image');
+            
+            // Clear previous content
+            while (albumArt.firstChild) {
+                albumArt.removeChild(albumArt.firstChild);
+            }
+            
             if (song.picture) {
                 const img = document.createElement('img');
                 img.src = song.picture;
                 img.alt = 'Album Art';
-                img.style.objectFit = 'cover';
-                img.style.objectPosition = 'center';
+                // Force reload by adding timestamp
+                img.onload = function() {
+                    albumArt.classList.add('has-image');
+                };
                 albumArt.appendChild(img);
-                albumArt.classList.add('has-image');
             } else {
-                albumArt.innerHTML = '<div class="song-number"></div>';
+                const placeholder = document.createElement('div');
+                placeholder.className = 'song-number';
+                albumArt.appendChild(placeholder);
             }
             
             renderPlaylist();
