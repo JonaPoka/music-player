@@ -516,8 +516,10 @@
         const volumeProgressRing = document.getElementById('volumeProgressRing');
         const volumeLevel = document.getElementById('volumeLevel');
 
-        // Create better click sound using Web Audio API
+        // Create Web Audio API context for sound effects
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Sound effect functions
         function playClickSound() {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
@@ -533,6 +535,180 @@
             
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.02);
+        }
+
+        // Vinyl slide out sound - smooth swoosh with friction
+        function playVinylSlideOutSound() {
+            const now = audioContext.currentTime;
+            
+            // Swoosh sound (white noise with filter)
+            const bufferSize = audioContext.sampleRate * 0.4;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+            }
+            
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+            
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200;
+            filter.Q.value = 1;
+            
+            const noiseGain = audioContext.createGain();
+            noiseGain.gain.setValueAtTime(0.15, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            
+            noiseSource.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            
+            noiseSource.start(now);
+            
+            // Low thump as vinyl leaves
+            const oscillator = audioContext.createOscillator();
+            const oscGain = audioContext.createGain();
+            
+            oscillator.frequency.setValueAtTime(80, now);
+            oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+            oscillator.type = 'sine';
+            
+            oscGain.gain.setValueAtTime(0.2, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            
+            oscillator.connect(oscGain);
+            oscGain.connect(audioContext.destination);
+            
+            oscillator.start(now);
+            oscillator.stop(now + 0.15);
+        }
+
+        // Vinyl slide in sound - smooth landing
+        function playVinylSlideInSound() {
+            const now = audioContext.currentTime;
+            
+            // Swoosh sound (white noise with filter)
+            const bufferSize = audioContext.sampleRate * 0.4;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (i / bufferSize);
+            }
+            
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+            
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1000;
+            filter.Q.value = 1;
+            
+            const noiseGain = audioContext.createGain();
+            noiseGain.gain.setValueAtTime(0.01, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.15, now + 0.3);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            
+            noiseSource.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            
+            noiseSource.start(now);
+            
+            // Landing thump
+            const oscillator = audioContext.createOscillator();
+            const oscGain = audioContext.createGain();
+            
+            oscillator.frequency.setValueAtTime(60, now + 0.35);
+            oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.5);
+            oscillator.type = 'sine';
+            
+            oscGain.gain.setValueAtTime(0.25, now + 0.35);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            
+            oscillator.connect(oscGain);
+            oscGain.connect(audioContext.destination);
+            
+            oscillator.start(now + 0.35);
+            oscillator.stop(now + 0.5);
+        }
+
+        // Tone arm movement sound - mechanical click and slide
+        function playToneArmSound(isLifting) {
+            const now = audioContext.currentTime;
+            
+            if (isLifting) {
+                // Lifting tone arm - mechanical click then smooth rise
+                // Click
+                const clickOsc = audioContext.createOscillator();
+                const clickGain = audioContext.createGain();
+                
+                clickOsc.frequency.value = 300;
+                clickOsc.type = 'square';
+                
+                clickGain.gain.setValueAtTime(0.15, now);
+                clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
+                
+                clickOsc.connect(clickGain);
+                clickGain.connect(audioContext.destination);
+                
+                clickOsc.start(now);
+                clickOsc.stop(now + 0.03);
+                
+                // Smooth mechanical rise
+                const riseOsc = audioContext.createOscillator();
+                const riseGain = audioContext.createGain();
+                
+                riseOsc.frequency.setValueAtTime(200, now + 0.05);
+                riseOsc.frequency.linearRampToValueAtTime(400, now + 0.35);
+                riseOsc.type = 'sine';
+                
+                riseGain.gain.setValueAtTime(0.08, now + 0.05);
+                riseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                
+                riseOsc.connect(riseGain);
+                riseGain.connect(audioContext.destination);
+                
+                riseOsc.start(now + 0.05);
+                riseOsc.stop(now + 0.35);
+                
+            } else {
+                // Lowering tone arm - smooth descent then gentle landing
+                const lowerOsc = audioContext.createOscillator();
+                const lowerGain = audioContext.createGain();
+                
+                lowerOsc.frequency.setValueAtTime(400, now);
+                lowerOsc.frequency.linearRampToValueAtTime(200, now + 0.3);
+                lowerOsc.type = 'sine';
+                
+                lowerGain.gain.setValueAtTime(0.08, now);
+                lowerGain.gain.exponentialRampToValueAtTime(0.05, now + 0.3);
+                
+                lowerOsc.connect(lowerGain);
+                lowerGain.connect(audioContext.destination);
+                
+                lowerOsc.start(now);
+                lowerOsc.stop(now + 0.3);
+                
+                // Landing click
+                const landOsc = audioContext.createOscillator();
+                const landGain = audioContext.createGain();
+                
+                landOsc.frequency.value = 250;
+                landOsc.type = 'square';
+                
+                landGain.gain.setValueAtTime(0.12, now + 0.3);
+                landGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                
+                landOsc.connect(landGain);
+                landGain.connect(audioContext.destination);
+                
+                landOsc.start(now + 0.3);
+                landOsc.stop(now + 0.35);
+            }
         }
 
         // Shuffle array
@@ -911,10 +1087,16 @@
                 await preloadSongMetadata(index);
             }
             
-            // Slide out current vinyl
+            // Stop music immediately and slide out current vinyl
             if (!skipAnimation) {
+                audio.pause();
+                audio.currentTime = 0;
+                
                 vinyl.classList.remove('spinning', 'slowing-down');
                 vinyl.classList.add('slide-out-right');
+                
+                // Play slide out sound
+                playVinylSlideOutSound();
                 
                 // Wait for slide out to complete
                 await new Promise(resolve => setTimeout(resolve, 400));
@@ -940,6 +1122,9 @@
                 vinyl.classList.remove('slide-out-right');
                 vinyl.classList.add('slide-in-left');
                 
+                // Play slide in sound
+                playVinylSlideInSound();
+                
                 // Wait for slide in to complete
                 await new Promise(resolve => setTimeout(resolve, 400));
                 vinyl.classList.remove('slide-in-left');
@@ -964,6 +1149,7 @@
             e.stopPropagation();
             if (isPlaying) {
                 // Pause with slowdown effect
+                playToneArmSound(true); // Lifting tone arm
                 audio.pause();
                 vinyl.classList.remove('spinning');
                 vinyl.classList.add('slowing-down');
@@ -975,6 +1161,7 @@
                 }, 2000);
             } else {
                 // Play
+                playToneArmSound(false); // Lowering tone arm
                 if (!audio.src) {
                     loadSong(0, true);
                 }
@@ -989,9 +1176,6 @@
         // Skip to next with animation
         function skipToNext() {
             const wasPlaying = isPlaying;
-            if (wasPlaying) {
-                isPlaying = false; // Temporarily set to false to prevent auto-playing during load
-            }
             
             currentPlaylistIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
             loadSong(currentPlaylistIndex).then(() => {
