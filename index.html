@@ -636,78 +636,107 @@
             oscillator.stop(now + 0.5);
         }
 
-        // Tone arm movement sound - mechanical click and slide
+        // Realistic tone arm movement sound - subtle mechanical friction
         function playToneArmSound(isLifting) {
             const now = audioContext.currentTime;
             
             if (isLifting) {
-                // Lifting tone arm - mechanical click then smooth rise
-                // Click
-                const clickOsc = audioContext.createOscillator();
-                const clickGain = audioContext.createGain();
+                // Lifting tone arm - very subtle mechanical friction
+                // Subtle white noise for friction
+                const bufferSize = audioContext.sampleRate * 0.5;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
                 
-                clickOsc.frequency.value = 300;
-                clickOsc.type = 'square';
+                for (let i = 0; i < bufferSize; i++) {
+                    // Fade out noise over time
+                    const envelope = Math.max(0, 1 - (i / bufferSize) * 1.5);
+                    data[i] = (Math.random() * 2 - 1) * envelope * 0.3;
+                }
                 
-                clickGain.gain.setValueAtTime(0.15, now);
-                clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
+                const noiseSource = audioContext.createBufferSource();
+                noiseSource.buffer = buffer;
                 
-                clickOsc.connect(clickGain);
-                clickGain.connect(audioContext.destination);
+                // Band-pass filter for mechanical sound
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 600;
+                filter.Q.value = 2;
                 
-                clickOsc.start(now);
-                clickOsc.stop(now + 0.03);
+                const noiseGain = audioContext.createGain();
+                noiseGain.gain.setValueAtTime(0.04, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
                 
-                // Smooth mechanical rise
-                const riseOsc = audioContext.createOscillator();
-                const riseGain = audioContext.createGain();
+                noiseSource.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioContext.destination);
                 
-                riseOsc.frequency.setValueAtTime(200, now + 0.05);
-                riseOsc.frequency.linearRampToValueAtTime(400, now + 0.35);
-                riseOsc.type = 'sine';
+                noiseSource.start(now);
                 
-                riseGain.gain.setValueAtTime(0.08, now + 0.05);
-                riseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                // Very subtle low-frequency rumble
+                const rumble = audioContext.createOscillator();
+                const rumbleGain = audioContext.createGain();
                 
-                riseOsc.connect(riseGain);
-                riseGain.connect(audioContext.destination);
+                rumble.frequency.setValueAtTime(50, now);
+                rumble.type = 'sine';
                 
-                riseOsc.start(now + 0.05);
-                riseOsc.stop(now + 0.35);
+                rumbleGain.gain.setValueAtTime(0.03, now);
+                rumbleGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                
+                rumble.connect(rumbleGain);
+                rumbleGain.connect(audioContext.destination);
+                
+                rumble.start(now);
+                rumble.stop(now + 0.3);
                 
             } else {
-                // Lowering tone arm - smooth descent then gentle landing
-                const lowerOsc = audioContext.createOscillator();
-                const lowerGain = audioContext.createGain();
+                // Lowering tone arm - gentle descent with subtle contact
+                // Mechanical friction during descent
+                const bufferSize = audioContext.sampleRate * 0.5;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
                 
-                lowerOsc.frequency.setValueAtTime(400, now);
-                lowerOsc.frequency.linearRampToValueAtTime(200, now + 0.3);
-                lowerOsc.type = 'sine';
+                for (let i = 0; i < bufferSize; i++) {
+                    // Fade in then fade out
+                    const progress = i / bufferSize;
+                    const envelope = Math.sin(progress * Math.PI) * 0.3;
+                    data[i] = (Math.random() * 2 - 1) * envelope;
+                }
                 
-                lowerGain.gain.setValueAtTime(0.08, now);
-                lowerGain.gain.exponentialRampToValueAtTime(0.05, now + 0.3);
+                const noiseSource = audioContext.createBufferSource();
+                noiseSource.buffer = buffer;
                 
-                lowerOsc.connect(lowerGain);
-                lowerGain.connect(audioContext.destination);
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 500;
+                filter.Q.value = 2;
                 
-                lowerOsc.start(now);
-                lowerOsc.stop(now + 0.3);
+                const noiseGain = audioContext.createGain();
+                noiseGain.gain.setValueAtTime(0.03, now);
+                noiseGain.gain.linearRampToValueAtTime(0.05, now + 0.25);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
                 
-                // Landing click
-                const landOsc = audioContext.createOscillator();
-                const landGain = audioContext.createGain();
+                noiseSource.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioContext.destination);
                 
-                landOsc.frequency.value = 250;
-                landOsc.type = 'square';
+                noiseSource.start(now);
                 
-                landGain.gain.setValueAtTime(0.12, now + 0.3);
-                landGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                // Very subtle contact/landing sound
+                const contact = audioContext.createOscillator();
+                const contactGain = audioContext.createGain();
                 
-                landOsc.connect(landGain);
-                landGain.connect(audioContext.destination);
+                contact.frequency.setValueAtTime(120, now + 0.45);
+                contact.frequency.exponentialRampToValueAtTime(80, now + 0.55);
+                contact.type = 'sine';
                 
-                landOsc.start(now + 0.3);
-                landOsc.stop(now + 0.35);
+                contactGain.gain.setValueAtTime(0.05, now + 0.45);
+                contactGain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+                
+                contact.connect(contactGain);
+                contactGain.connect(audioContext.destination);
+                
+                contact.start(now + 0.45);
+                contact.stop(now + 0.55);
             }
         }
 
