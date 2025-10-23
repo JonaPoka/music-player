@@ -52,6 +52,7 @@
             width: 280px;
             height: 280px;
             margin: 0 auto 30px;
+            overflow: hidden;
         }
 
         /* Turntable base */
@@ -63,6 +64,7 @@
             border-radius: 50%;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8),
                         inset 0 2px 10px rgba(255, 255, 255, 0.03);
+            z-index: 1;
         }
 
         /* Vinyl record */
@@ -73,6 +75,8 @@
             border-radius: 50%;
             cursor: pointer;
             animation: none;
+            z-index: 2;
+            transition: none;
         }
 
         .vinyl.spinning {
@@ -81,6 +85,15 @@
 
         .vinyl.slowing-down {
             animation: slowDown 2s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+        }
+
+        /* Vinyl slide animations */
+        .vinyl.slide-out-right {
+            animation: slideOutRight 0.4s cubic-bezier(0.6, 0, 0.8, 0.2) forwards;
+        }
+
+        .vinyl.slide-in-left {
+            animation: slideInLeft 0.4s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
         }
 
         @keyframes spin {
@@ -94,6 +107,28 @@
             }
             100% { 
                 transform: rotate(720deg);
+            }
+        }
+
+        @keyframes slideOutRight {
+            0% {
+                transform: translateX(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(350px) rotate(45deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideInLeft {
+            0% {
+                transform: translateX(-350px) rotate(-45deg);
+                opacity: 0;
+            }
+            100% {
+                transform: translateX(0) rotate(0deg);
+                opacity: 1;
             }
         }
 
@@ -399,495 +434,5 @@
         /* Volume level indicator */
         .volume-level {
             position: absolute;
-            bottom: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 10px;
-            color: #a1887f;
-            opacity: 0;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-        }
-
-        .volume-knob-container:hover .volume-level,
-        .volume-knob-container.active .volume-level {
-            opacity: 1;
-        }
-    </style>
-</head>
-<body>
-    <div class="player-container">
-        <div class="shuffle-indicator">🔀 Shuffle On</div>
-        
-        <div class="vinyl-container">
-            <div class="turntable"></div>
-            <div class="vinyl" id="vinyl">
-                <div class="vinyl-label" id="vinylLabel">
-                    <div class="song-number">♪</div>
-                </div>
-            </div>
-            <!-- Skip zone is now OUTSIDE vinyl so it doesn't spin -->
-            <div class="vinyl-skip-zone" id="skipZone"></div>
-            <div class="tone-arm" id="toneArm"></div>
-        </div>
-
-        <div class="now-playing" id="nowPlaying">
-            <div class="now-playing-label">Now Playing</div>
-            <div class="now-playing-title">-</div>
-            <div class="now-playing-artist">-</div>
-        </div>
-
-        <div class="up-next" id="upNext">
-            <div class="up-next-label">Up Next</div>
-            <div class="up-next-info">-</div>
-            <div class="up-next-artist"></div>
-        </div>
-
-        <div class="volume-knob-container" id="volumeKnobContainer">
-            <svg class="volume-knob-progress" width="80" height="80">
-                <circle cx="40" cy="40" r="36" />
-                <circle class="progress-ring" cx="40" cy="40" r="36" 
-                        stroke-dasharray="226.19" 
-                        stroke-dashoffset="67.86" 
-                        id="volumeProgressRing"/>
-            </svg>
-            <div class="volume-knob" id="volumeKnob"></div>
-            <div class="volume-level" id="volumeLevel">70%</div>
-        </div>
-    </div>
-
-    <!-- Audio element for click sound -->
-    <audio id="clickSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRhIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU4AAAA=" type="audio/wav">
-    </audio>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-    <script>
-        const audio = new Audio();
-        let songs = [];
-        let shuffledPlaylist = [];
-        let currentPlaylistIndex = 0;
-        let isPlaying = false;
-        let currentVolume = 70;
-        let isDraggingKnob = false;
-        let lastTickVolume = 70;
-
-        // DOM elements
-        const vinyl = document.getElementById('vinyl');
-        const vinylLabel = document.getElementById('vinylLabel');
-        const skipZone = document.getElementById('skipZone');
-        const toneArm = document.getElementById('toneArm');
-        const nowPlaying = document.getElementById('nowPlaying');
-        const upNext = document.getElementById('upNext');
-        const volumeKnob = document.getElementById('volumeKnob');
-        const volumeKnobContainer = document.getElementById('volumeKnobContainer');
-        const volumeProgressRing = document.getElementById('volumeProgressRing');
-        const volumeLevel = document.getElementById('volumeLevel');
-        const clickSound = document.getElementById('clickSound');
-
-        // Create better click sound using Web Audio API
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        function playClickSound() {
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.02);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.02);
-        }
-
-        // Shuffle array
-        function shuffleArray(array) {
-            const shuffled = [...array];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-            return shuffled;
-        }
-
-        // Update volume knob rotation and progress ring
-        function updateVolumeKnob(volume) {
-            const angle = -135 + (volume / 100) * 270;
-            volumeKnob.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
-            
-            const circumference = 2 * Math.PI * 36;
-            const progressLength = (volume / 100) * (circumference * 0.75);
-            const offset = circumference - progressLength;
-            volumeProgressRing.style.strokeDashoffset = offset;
-            
-            volumeLevel.textContent = `${Math.round(volume)}%`;
-        }
-
-        // Volume knob interaction - CIRCULAR DRAGGING
-        function startKnobDrag(e) {
-            e.preventDefault();
-            isDraggingKnob = true;
-            volumeKnobContainer.classList.add('active');
-            document.body.style.cursor = 'grabbing';
-        }
-
-        function dragKnob(e) {
-            if (!isDraggingKnob) return;
-            e.preventDefault();
-            
-            // Get knob center position
-            const rect = volumeKnob.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            
-            // Get mouse/touch position
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            // Calculate angle from center to mouse
-            const dx = clientX - centerX;
-            const dy = clientY - centerY;
-            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-            
-            // Adjust angle to match our knob's range (-135° to 135°)
-            // atan2 gives us -180 to 180, we need to map this to our 0-100 volume range
-            angle = angle + 90; // Rotate reference frame so top is 0°
-            if (angle < 0) angle += 360;
-            
-            // Map angle to volume (0-100)
-            // Our knob goes from 225° (-135° adjusted) to 45° (135° adjusted) = 270° total range
-            let normalizedAngle = angle - 225; // Start from bottom-left
-            if (normalizedAngle < 0) normalizedAngle += 360;
-            
-            // Only update if within valid range
-            if (normalizedAngle <= 270) {
-                let newVolume = (normalizedAngle / 270) * 100;
-                newVolume = Math.max(0, Math.min(100, newVolume));
-                
-                // Play click sound every 5% change
-                if (Math.abs(newVolume - lastTickVolume) >= 5) {
-                    playClickSound();
-                    lastTickVolume = Math.round(newVolume / 5) * 5;
-                }
-                
-                currentVolume = newVolume;
-                audio.volume = newVolume / 100;
-                updateVolumeKnob(newVolume);
-            }
-        }
-
-        function stopKnobDrag() {
-            if (isDraggingKnob) {
-                isDraggingKnob = false;
-                volumeKnobContainer.classList.remove('active');
-                document.body.style.cursor = 'default';
-            }
-        }
-
-        // Add volume knob event listeners
-        volumeKnob.addEventListener('mousedown', startKnobDrag);
-        volumeKnob.addEventListener('touchstart', startKnobDrag);
-        document.addEventListener('mousemove', dragKnob);
-        document.addEventListener('touchmove', dragKnob);
-        document.addEventListener('mouseup', stopKnobDrag);
-        document.addEventListener('touchend', stopKnobDrag);
-
-        // Crop transparent pixels from image
-        function cropTransparentPixels(imageSrc) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const data = imageData.data;
-                    
-                    let top = 0, bottom = canvas.height, left = 0, right = canvas.width;
-                    
-                    rowLoop: for (let y = 0; y < canvas.height; y++) {
-                        for (let x = 0; x < canvas.width; x++) {
-                            const alpha = data[(y * canvas.width + x) * 4 + 3];
-                            if (alpha > 0) {
-                                top = y;
-                                break rowLoop;
-                            }
-                        }
-                    }
-                    
-                    rowLoopBottom: for (let y = canvas.height - 1; y >= 0; y--) {
-                        for (let x = 0; x < canvas.width; x++) {
-                            const alpha = data[(y * canvas.width + x) * 4 + 3];
-                            if (alpha > 0) {
-                                bottom = y + 1;
-                                break rowLoopBottom;
-                            }
-                        }
-                    }
-                    
-                    colLoop: for (let x = 0; x < canvas.width; x++) {
-                        for (let y = 0; y < canvas.height; y++) {
-                            const alpha = data[(y * canvas.width + x) * 4 + 3];
-                            if (alpha > 0) {
-                                left = x;
-                                break colLoop;
-                            }
-                        }
-                    }
-                    
-                    colLoopRight: for (let x = canvas.width - 1; x >= 0; x--) {
-                        for (let y = 0; y < canvas.height; y++) {
-                            const alpha = data[(y * canvas.width + x) * 4 + 3];
-                            if (alpha > 0) {
-                                right = x + 1;
-                                break colLoopRight;
-                            }
-                        }
-                    }
-                    
-                    const croppedWidth = right - left;
-                    const croppedHeight = bottom - top;
-                    
-                    const finalCanvas = document.createElement('canvas');
-                    const finalCtx = finalCanvas.getContext('2d');
-                    
-                    const size = croppedHeight;
-                    finalCanvas.width = size;
-                    finalCanvas.height = size;
-                    
-                    const horizontalCenter = left + (croppedWidth / 2);
-                    const cropLeft = Math.max(0, horizontalCenter - (size / 2));
-                    
-                    finalCtx.drawImage(
-                        img,
-                        cropLeft, top, size, size,
-                        0, 0, size, size
-                    );
-                    
-                    resolve(finalCanvas);
-                };
-                
-                img.onerror = function() {
-                    resolve(null);
-                };
-                
-                img.src = imageSrc;
-            });
-        }
-
-        // Extract metadata from audio file URL
-        async function extractMetadata(fileUrl) {
-            return new Promise(async (resolve) => {
-                try {
-                    const response = await fetch(fileUrl);
-                    const blob = await response.blob();
-                    
-                    jsmediatags.read(blob, {
-                        onSuccess: function(tag) {
-                            const tags = tag.tags;
-                            const metadata = {
-                                title: tags.title || fileUrl.split('/').pop().replace(/\.[^/.]+$/, ""),
-                                artist: tags.artist || 'Unknown Artist',
-                                album: tags.album || '',
-                                duration: 0,
-                                picture: null
-                            };
-
-                            if (tags.picture) {
-                                const picture = tags.picture;
-                                const base64String = picture.data.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
-                                metadata.picture = `data:${picture.format};base64,${btoa(base64String)}`;
-                            }
-
-                            resolve(metadata);
-                        },
-                        onError: function(error) {
-                            console.log('Error reading metadata for', fileUrl, ':', error);
-                            resolve({
-                                title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
-                                artist: 'Unknown Artist',
-                                album: '',
-                                duration: 0,
-                                picture: null
-                            });
-                        }
-                    });
-                } catch (error) {
-                    console.error('Error fetching file:', error);
-                    resolve({
-                        title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
-                        artist: 'Unknown Artist',
-                        album: '',
-                        duration: 0,
-                        picture: null
-                    });
-                }
-            });
-        }
-
-        // Load songs from songs.json
-        async function loadSongsFromJSON() {
-            try {
-                const response = await fetch('songs.json');
-                if (!response.ok) throw new Error('songs.json not found');
-                
-                const data = await response.json();
-                
-                if (!data.songs || data.songs.length === 0) {
-                    throw new Error('No songs found in songs.json');
-                }
-                
-                for (const songFile of data.songs) {
-                    const songPath = `songs/${encodeURIComponent(songFile)}`;
-                    const metadata = await extractMetadata(songPath);
-                    
-                    const tempAudio = new Audio(songPath);
-                    await new Promise((resolve) => {
-                        tempAudio.addEventListener('loadedmetadata', () => {
-                            metadata.duration = tempAudio.duration;
-                            resolve();
-                        });
-                        tempAudio.addEventListener('error', () => {
-                            console.error('Error loading audio:', songFile);
-                            resolve();
-                        });
-                    });
-                    
-                    songs.push({
-                        file: songPath,
-                        ...metadata
-                    });
-                }
-                
-                if (songs.length === 0) {
-                    throw new Error('No songs could be loaded');
-                }
-                
-                shuffledPlaylist = shuffleArray(songs);
-                init();
-            } catch (error) {
-                console.error('Error loading songs:', error);
-                nowPlaying.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-            }
-        }
-
-        // Initialize player
-        function init() {
-            audio.volume = currentVolume / 100;
-            updateVolumeKnob(currentVolume);
-            updateUpNext();
-            
-            toneArm.addEventListener('click', togglePlayPause);
-            skipZone.addEventListener('click', (e) => {
-                e.stopPropagation();
-                skipToNext();
-            });
-            
-            audio.addEventListener('ended', skipToNext);
-        }
-
-        // Update now playing display
-        function updateNowPlaying(song) {
-            nowPlaying.innerHTML = `
-                <div class="now-playing-label">Now Playing</div>
-                <div class="now-playing-title">${song.title}</div>
-                <div class="now-playing-artist">${song.artist}</div>
-            `;
-            nowPlaying.classList.add('fade-in');
-            setTimeout(() => nowPlaying.classList.remove('fade-in'), 500);
-        }
-
-        // Update up next display
-        function updateUpNext() {
-            const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
-            const nextSong = shuffledPlaylist[nextIndex];
-            
-            upNext.innerHTML = `
-                <div class="up-next-label">Up Next</div>
-                <div class="up-next-info">${nextSong.title}</div>
-                <div class="up-next-artist">${nextSong.artist}</div>
-            `;
-            upNext.classList.add('fade-in');
-            setTimeout(() => upNext.classList.remove('fade-in'), 500);
-        }
-
-        // Load song
-        async function loadSong(index) {
-            currentPlaylistIndex = index;
-            const song = shuffledPlaylist[index];
-            
-            audio.src = song.file;
-            updateNowPlaying(song);
-            updateUpNext();
-            
-            // Update vinyl label
-            vinylLabel.innerHTML = '';
-            
-            if (song.picture) {
-                const croppedCanvas = await cropTransparentPixels(song.picture);
-                
-                if (croppedCanvas) {
-                    vinylLabel.appendChild(croppedCanvas);
-                } else {
-                    vinylLabel.innerHTML = '<div class="song-number">♪</div>';
-                }
-            } else {
-                vinylLabel.innerHTML = '<div class="song-number">♪</div>';
-            }
-            
-            if (isPlaying) {
-                audio.play();
-            }
-        }
-
-        // Toggle play/pause with gradual vinyl slowdown
-        function togglePlayPause(e) {
-            e.stopPropagation();
-            if (isPlaying) {
-                // Pause with slowdown effect
-                audio.pause();
-                vinyl.classList.remove('spinning');
-                vinyl.classList.add('slowing-down');
-                toneArm.classList.remove('playing');
-                
-                // Remove slowing-down class after animation completes
-                setTimeout(() => {
-                    vinyl.classList.remove('slowing-down');
-                }, 2000);
-            } else {
-                // Play
-                if (!audio.src) {
-                    loadSong(0);
-                }
-                audio.play();
-                vinyl.classList.remove('slowing-down');
-                vinyl.classList.add('spinning');
-                toneArm.classList.add('playing');
-            }
-            isPlaying = !isPlaying;
-        }
-
-        // Skip to next
-        function skipToNext() {
-            currentPlaylistIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
-            loadSong(currentPlaylistIndex);
-            if (isPlaying) {
-                audio.play();
-            }
-        }
-
-        // Start loading songs
-        loadSongsFromJSON();
-    </script>
-</body>
-</html>
+            *
+
