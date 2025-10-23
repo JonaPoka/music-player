@@ -434,5 +434,577 @@
         /* Volume level indicator */
         .volume-level {
             position: absolute;
-            *
-
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #a1887f;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+
+        .volume-knob-container:hover .volume-level,
+        .volume-knob-container.active .volume-level {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="player-container">
+        <div class="shuffle-indicator">🔀 Shuffle On</div>
+        
+        <div class="vinyl-container">
+            <div class="turntable"></div>
+            <div class="vinyl" id="vinyl">
+                <div class="vinyl-label" id="vinylLabel">
+                    <div class="song-number">♪</div>
+                </div>
+            </div>
+            <!-- Skip zone is now OUTSIDE vinyl so it doesn't spin -->
+            <div class="vinyl-skip-zone" id="skipZone"></div>
+            <div class="tone-arm" id="toneArm"></div>
+        </div>
+
+        <div class="now-playing" id="nowPlaying">
+            <div class="now-playing-label">Now Playing</div>
+            <div class="now-playing-title">-</div>
+            <div class="now-playing-artist">-</div>
+        </div>
+
+        <div class="up-next" id="upNext">
+            <div class="up-next-label">Up Next</div>
+            <div class="up-next-info">-</div>
+            <div class="up-next-artist"></div>
+        </div>
+
+        <div class="volume-knob-container" id="volumeKnobContainer">
+            <svg class="volume-knob-progress" width="80" height="80">
+                <circle cx="40" cy="40" r="36" />
+                <circle class="progress-ring" cx="40" cy="40" r="36" 
+                        stroke-dasharray="226.19" 
+                        stroke-dashoffset="67.86" 
+                        id="volumeProgressRing"/>
+            </svg>
+            <div class="volume-knob" id="volumeKnob"></div>
+            <div class="volume-level" id="volumeLevel">70%</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <script>
+        const audio = new Audio();
+        let songs = [];
+        let shuffledPlaylist = [];
+        let currentPlaylistIndex = 0;
+        let isPlaying = false;
+        let currentVolume = 70;
+        let isDraggingKnob = false;
+        let lastKnobAngle = -135 + (70 / 100) * 270; // Start at 70% volume angle
+        let metadataCache = {}; // Cache for loaded metadata
+
+        // DOM elements
+        const vinyl = document.getElementById('vinyl');
+        const vinylLabel = document.getElementById('vinylLabel');
+        const skipZone = document.getElementById('skipZone');
+        const toneArm = document.getElementById('toneArm');
+        const nowPlaying = document.getElementById('nowPlaying');
+        const upNext = document.getElementById('upNext');
+        const volumeKnob = document.getElementById('volumeKnob');
+        const volumeKnobContainer = document.getElementById('volumeKnobContainer');
+        const volumeProgressRing = document.getElementById('volumeProgressRing');
+        const volumeLevel = document.getElementById('volumeLevel');
+
+        // Create better click sound using Web Audio API
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        function playClickSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.02);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.02);
+        }
+
+        // Shuffle array
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Update volume knob rotation and progress ring
+        function updateVolumeKnob(volume) {
+            const angle = -135 + (volume / 100) * 270;
+            volumeKnob.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+            
+            const circumference = 2 * Math.PI * 36;
+            const progressLength = (volume / 100) * (circumference * 0.75);
+            const offset = circumference - progressLength;
+            volumeProgressRing.style.strokeDashoffset = offset;
+            
+            volumeLevel.textContent = `${Math.round(volume)}%`;
+        }
+
+        // Volume knob interaction - CIRCULAR DRAGGING with rotation-based clicks
+        function startKnobDrag(e) {
+            e.preventDefault();
+            isDraggingKnob = true;
+            volumeKnobContainer.classList.add('active');
+            document.body.style.cursor = 'grabbing';
+            
+            // Initialize lastKnobAngle with current angle
+            lastKnobAngle = -135 + (currentVolume / 100) * 270;
+        }
+
+        function dragKnob(e) {
+            if (!isDraggingKnob) return;
+            e.preventDefault();
+            
+            // Get knob center position
+            const rect = volumeKnob.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Get mouse/touch position
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            // Calculate angle from center to mouse
+            const dx = clientX - centerX;
+            const dy = clientY - centerY;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            
+            // Adjust angle to match our knob's range (-135° to 135°)
+            angle = angle + 90; // Rotate reference frame so top is 0°
+            if (angle < 0) angle += 360;
+            
+            // Map angle to volume (0-100)
+            let normalizedAngle = angle - 225; // Start from bottom-left
+            if (normalizedAngle < 0) normalizedAngle += 360;
+            
+            // Only update if within valid range
+            if (normalizedAngle <= 270) {
+                let newVolume = (normalizedAngle / 270) * 100;
+                newVolume = Math.max(0, Math.min(100, newVolume));
+                
+                // Calculate current knob angle in our coordinate system
+                const currentKnobAngle = -135 + (newVolume / 100) * 270;
+                
+                // Calculate angle difference (rotation amount)
+                let angleDiff = Math.abs(currentKnobAngle - lastKnobAngle);
+                
+                // Play click sound every 15 degrees of rotation (approximately every 5.5% volume change)
+                // This gives consistent clicks based on physical rotation
+                if (angleDiff >= 15) {
+                    playClickSound();
+                    lastKnobAngle = currentKnobAngle;
+                }
+                
+                currentVolume = newVolume;
+                audio.volume = newVolume / 100;
+                updateVolumeKnob(newVolume);
+            }
+        }
+
+        function stopKnobDrag() {
+            if (isDraggingKnob) {
+                isDraggingKnob = false;
+                volumeKnobContainer.classList.remove('active');
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        // Add volume knob event listeners
+        volumeKnob.addEventListener('mousedown', startKnobDrag);
+        volumeKnob.addEventListener('touchstart', startKnobDrag);
+        document.addEventListener('mousemove', dragKnob);
+        document.addEventListener('touchmove', dragKnob);
+        document.addEventListener('mouseup', stopKnobDrag);
+        document.addEventListener('touchend', stopKnobDrag);
+
+        // Crop transparent pixels from image
+        function cropTransparentPixels(imageSrc) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    let top = 0, bottom = canvas.height, left = 0, right = canvas.width;
+                    
+                    rowLoop: for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                top = y;
+                                break rowLoop;
+                            }
+                        }
+                    }
+                    
+                    rowLoopBottom: for (let y = canvas.height - 1; y >= 0; y--) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                bottom = y + 1;
+                                break rowLoopBottom;
+                            }
+                        }
+                    }
+                    
+                    colLoop: for (let x = 0; x < canvas.width; x++) {
+                        for (let y = 0; y < canvas.height; y++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                left = x;
+                                break colLoop;
+                            }
+                        }
+                    }
+                    
+                    colLoopRight: for (let x = canvas.width - 1; x >= 0; x--) {
+                        for (let y = 0; y < canvas.height; y++) {
+                            const alpha = data[(y * canvas.width + x) * 4 + 3];
+                            if (alpha > 0) {
+                                right = x + 1;
+                                break colLoopRight;
+                            }
+                        }
+                    }
+                    
+                    const croppedWidth = right - left;
+                    const croppedHeight = bottom - top;
+                    
+                    const finalCanvas = document.createElement('canvas');
+                    const finalCtx = finalCanvas.getContext('2d');
+                    
+                    const size = croppedHeight;
+                    finalCanvas.width = size;
+                    finalCanvas.height = size;
+                    
+                    const horizontalCenter = left + (croppedWidth / 2);
+                    const cropLeft = Math.max(0, horizontalCenter - (size / 2));
+                    
+                    finalCtx.drawImage(
+                        img,
+                        cropLeft, top, size, size,
+                        0, 0, size, size
+                    );
+                    
+                    resolve(finalCanvas);
+                };
+                
+                img.onerror = function() {
+                    resolve(null);
+                };
+                
+                img.src = imageSrc;
+            });
+        }
+
+        // Extract metadata from audio file URL - LAZY LOADING VERSION
+        async function extractMetadata(fileUrl) {
+            // Check cache first
+            if (metadataCache[fileUrl]) {
+                return metadataCache[fileUrl];
+            }
+
+            return new Promise(async (resolve) => {
+                try {
+                    const response = await fetch(fileUrl);
+                    const blob = await response.blob();
+                    
+                    jsmediatags.read(blob, {
+                        onSuccess: function(tag) {
+                            const tags = tag.tags;
+                            const metadata = {
+                                title: tags.title || fileUrl.split('/').pop().replace(/\.[^/.]+$/, ""),
+                                artist: tags.artist || 'Unknown Artist',
+                                album: tags.album || '',
+                                duration: 0,
+                                picture: null
+                            };
+
+                            if (tags.picture) {
+                                const picture = tags.picture;
+                                const base64String = picture.data.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+                                metadata.picture = `data:${picture.format};base64,${btoa(base64String)}`;
+                            }
+
+                            // Cache the metadata
+                            metadataCache[fileUrl] = metadata;
+                            resolve(metadata);
+                        },
+                        onError: function(error) {
+                            console.log('Error reading metadata for', fileUrl, ':', error);
+                            const metadata = {
+                                title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
+                                artist: 'Unknown Artist',
+                                album: '',
+                                duration: 0,
+                                picture: null
+                            };
+                            metadataCache[fileUrl] = metadata;
+                            resolve(metadata);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error fetching file:', error);
+                    const metadata = {
+                        title: fileUrl.split('/').pop().replace(/\.[^/.]+$/, "").replace(/%20/g, " "),
+                        artist: 'Unknown Artist',
+                        album: '',
+                        duration: 0,
+                        picture: null
+                    };
+                    metadataCache[fileUrl] = metadata;
+                    resolve(metadata);
+                }
+            });
+        }
+
+        // Load songs from songs.json - LAZY VERSION (no metadata fetching upfront)
+        async function loadSongsFromJSON() {
+            try {
+                const response = await fetch('songs.json');
+                if (!response.ok) throw new Error('songs.json not found');
+                
+                const data = await response.json();
+                
+                if (!data.songs || data.songs.length === 0) {
+                    throw new Error('No songs found in songs.json');
+                }
+                
+                // Just create song list with file paths - NO metadata fetching!
+                for (const songFile of data.songs) {
+                    const songPath = `songs/${encodeURIComponent(songFile)}`;
+                    songs.push({
+                        file: songPath,
+                        title: null, // Will be loaded on demand
+                        artist: null,
+                        album: null,
+                        duration: 0,
+                        picture: null
+                    });
+                }
+                
+                if (songs.length === 0) {
+                    throw new Error('No songs could be loaded');
+                }
+                
+                shuffledPlaylist = shuffleArray(songs);
+                
+                // Preload metadata for first and next song only
+                await preloadSongMetadata(0);
+                if (shuffledPlaylist.length > 1) {
+                    preloadSongMetadata(1); // Non-blocking
+                }
+                
+                init();
+            } catch (error) {
+                console.error('Error loading songs:', error);
+                nowPlaying.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Preload metadata for a specific song index
+        async function preloadSongMetadata(index) {
+            const song = shuffledPlaylist[index];
+            if (!song || song.title !== null) return; // Already loaded
+            
+            const metadata = await extractMetadata(song.file);
+            
+            // Update song object with metadata
+            song.title = metadata.title;
+            song.artist = metadata.artist;
+            song.album = metadata.album;
+            song.picture = metadata.picture;
+            
+            // Get duration
+            const tempAudio = new Audio(song.file);
+            await new Promise((resolve) => {
+                tempAudio.addEventListener('loadedmetadata', () => {
+                    song.duration = tempAudio.duration;
+                    resolve();
+                });
+                tempAudio.addEventListener('error', () => {
+                    console.error('Error loading audio:', song.file);
+                    resolve();
+                });
+            });
+        }
+
+        // Initialize player
+        function init() {
+            audio.volume = currentVolume / 100;
+            updateVolumeKnob(currentVolume);
+            updateUpNext();
+            
+            toneArm.addEventListener('click', togglePlayPause);
+            skipZone.addEventListener('click', (e) => {
+                e.stopPropagation();
+                skipToNext();
+            });
+            
+            audio.addEventListener('ended', skipToNext);
+        }
+
+        // Update now playing display
+        function updateNowPlaying(song) {
+            nowPlaying.innerHTML = `
+                <div class="now-playing-label">Now Playing</div>
+                <div class="now-playing-title">${song.title || 'Loading...'}</div>
+                <div class="now-playing-artist">${song.artist || ''}</div>
+            `;
+            nowPlaying.classList.add('fade-in');
+            setTimeout(() => nowPlaying.classList.remove('fade-in'), 500);
+        }
+
+        // Update up next display
+        async function updateUpNext() {
+            const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
+            const nextSong = shuffledPlaylist[nextIndex];
+            
+            // Preload next song metadata if not loaded
+            if (nextSong.title === null) {
+                await preloadSongMetadata(nextIndex);
+            }
+            
+            upNext.innerHTML = `
+                <div class="up-next-label">Up Next</div>
+                <div class="up-next-info">${nextSong.title || 'Loading...'}</div>
+                <div class="up-next-artist">${nextSong.artist || ''}</div>
+            `;
+            upNext.classList.add('fade-in');
+            setTimeout(() => upNext.classList.remove('fade-in'), 500);
+        }
+
+        // Load song with vinyl slide animation
+        async function loadSong(index, skipAnimation = false) {
+            currentPlaylistIndex = index;
+            const song = shuffledPlaylist[index];
+            
+            // Preload metadata if not loaded
+            if (song.title === null) {
+                await preloadSongMetadata(index);
+            }
+            
+            // Slide out current vinyl
+            if (!skipAnimation) {
+                vinyl.classList.remove('spinning', 'slowing-down');
+                vinyl.classList.add('slide-out-right');
+                
+                // Wait for slide out to complete
+                await new Promise(resolve => setTimeout(resolve, 400));
+            }
+            
+            // Update vinyl label while off-screen
+            vinylLabel.innerHTML = '';
+            
+            if (song.picture) {
+                const croppedCanvas = await cropTransparentPixels(song.picture);
+                
+                if (croppedCanvas) {
+                    vinylLabel.appendChild(croppedCanvas);
+                } else {
+                    vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                }
+            } else {
+                vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+            }
+            
+            // Slide in new vinyl
+            if (!skipAnimation) {
+                vinyl.classList.remove('slide-out-right');
+                vinyl.classList.add('slide-in-left');
+                
+                // Wait for slide in to complete
+                await new Promise(resolve => setTimeout(resolve, 400));
+                vinyl.classList.remove('slide-in-left');
+            }
+            
+            audio.src = song.file;
+            updateNowPlaying(song);
+            updateUpNext();
+            
+            // Preload next song metadata
+            const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
+            preloadSongMetadata(nextIndex);
+            
+            if (isPlaying) {
+                vinyl.classList.add('spinning');
+                audio.play();
+            }
+        }
+
+        // Toggle play/pause with gradual vinyl slowdown
+        function togglePlayPause(e) {
+            e.stopPropagation();
+            if (isPlaying) {
+                // Pause with slowdown effect
+                audio.pause();
+                vinyl.classList.remove('spinning');
+                vinyl.classList.add('slowing-down');
+                toneArm.classList.remove('playing');
+                
+                // Remove slowing-down class after animation completes
+                setTimeout(() => {
+                    vinyl.classList.remove('slowing-down');
+                }, 2000);
+            } else {
+                // Play
+                if (!audio.src) {
+                    loadSong(0, true);
+                }
+                audio.play();
+                vinyl.classList.remove('slowing-down');
+                vinyl.classList.add('spinning');
+                toneArm.classList.add('playing');
+            }
+            isPlaying = !isPlaying;
+        }
+
+        // Skip to next with animation
+        function skipToNext() {
+            const wasPlaying = isPlaying;
+            if (wasPlaying) {
+                isPlaying = false; // Temporarily set to false to prevent auto-playing during load
+            }
+            
+            currentPlaylistIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
+            loadSong(currentPlaylistIndex).then(() => {
+                if (wasPlaying) {
+                    isPlaying = true;
+                    vinyl.classList.add('spinning');
+                    toneArm.classList.add('playing');
+                    audio.play();
+                }
+            });
+        }
+
+        // Start loading songs
+        loadSongsFromJSON();
+    </script>
+</body>
+</html>
