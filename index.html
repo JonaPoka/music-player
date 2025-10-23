@@ -1062,9 +1062,13 @@
         }
 
         // Initialize player
-        function init() {
+        async function init() {
             audio.volume = currentVolume / 100;
             updateVolumeKnob(currentVolume);
+            
+            // Load the first song into the player (but don't play it)
+            await loadSongInitial(0);
+            
             updateUpNext();
             
             toneArm.addEventListener('click', togglePlayPause);
@@ -1074,6 +1078,38 @@
             });
             
             audio.addEventListener('ended', skipToNext);
+        }
+
+        // Load initial song (without animation, just sets it up)
+        async function loadSongInitial(index) {
+            currentPlaylistIndex = index;
+            const song = shuffledPlaylist[index];
+            
+            // Metadata should already be preloaded, but double-check
+            if (song.title === null) {
+                await preloadSongMetadata(index);
+            }
+            
+            // Update vinyl label
+            vinylLabel.innerHTML = '';
+            
+            if (song.picture) {
+                const croppedCanvas = await cropTransparentPixels(song.picture);
+                
+                if (croppedCanvas) {
+                    vinylLabel.appendChild(croppedCanvas);
+                } else {
+                    vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                }
+            } else {
+                vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+            }
+            
+            // Set audio source
+            audio.src = song.file;
+            
+            // Update now playing display
+            updateNowPlaying(song);
         }
 
         // Update now playing display
@@ -1191,9 +1227,6 @@
             } else {
                 // Play
                 playToneArmSound(false); // Lowering tone arm
-                if (!audio.src) {
-                    loadSong(0, true);
-                }
                 audio.play();
                 vinyl.classList.remove('slowing-down');
                 vinyl.classList.add('spinning');
