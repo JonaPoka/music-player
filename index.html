@@ -97,6 +97,45 @@
             }
         }
 
+        /* Vinyl switching animations */
+        @keyframes vinylSlideOut {
+            0% {
+                transform: translateX(0) scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: translateX(150%) scale(0.8);
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateX(150%) scale(0.8);
+                opacity: 0;
+            }
+        }
+
+        @keyframes vinylSlideIn {
+            0% {
+                transform: translateX(-150%) scale(0.8);
+                opacity: 0;
+            }
+            50% {
+                transform: translateX(-150%) scale(0.8);
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateX(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .vinyl.sliding-out {
+            animation: vinylSlideOut 0.6s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+        }
+
+        .vinyl.sliding-in {
+            animation: vinylSlideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
         /* Vinyl grooves */
         .vinyl::before {
             content: '';
@@ -471,6 +510,8 @@
         let currentVolume = 70;
         let isDraggingKnob = false;
         let lastTickVolume = 70;
+        let preloadedAudioElements = {}; // Cache for preloaded audio elements
+        let isTransitioning = false; // Flag to prevent interaction during vinyl switch animation
 
         // DOM elements
         const vinyl = document.getElementById('vinyl');
@@ -818,19 +859,84 @@
             }
         }
 
+        // Preload next 5 songs in the shuffle queue
+        async function preloadNextSongs(startIndex) {
+            const preloadCount = 5;
+            
+            for (let i = 1; i <= preloadCount; i++) {
+                const nextIndex = (startIndex + i) % shuffledPlaylist.length;
+                const song = shuffledPlaylist[nextIndex];
+                
+                // Load metadata if not already loaded
+                if (!song.metadataLoaded) {
+                    loadSongMetadata(nextIndex).catch(err => 
+                        console.error('Error loading metadata for preload:', err)
+                    );
+                }
+                
+                // Preload audio data
+                if (!preloadedAudioElements[song.file]) {
+                    const preloadAudio = new Audio();
+                    preloadAudio.preload = 'auto';
+                    preloadAudio.src = song.file;
+                    preloadedAudioElements[song.file] = preloadAudio;
+                    
+                    // Start loading
+                    preloadAudio.load();
+                }
+            }
+        }
+
         // Initialize player
-        function init() {
+        async function init() {
             audio.volume = currentVolume / 100;
             updateVolumeKnob(currentVolume);
-            updateUpNext();
+            
+            // Load and display the first song immediately
+            await loadFirstSong();
             
             toneArm.addEventListener('click', togglePlayPause);
             skipZone.addEventListener('click', (e) => {
                 e.stopPropagation();
-                skipToNext();
+                if (!isTransitioning) {
+                    skipToNext();
+                }
             });
             
             audio.addEventListener('ended', skipToNext);
+        }
+
+        // Load and display first song on page load
+        async function loadFirstSong() {
+            try {
+                // Load metadata for first song
+                const firstSong = await loadSongMetadata(0);
+                
+                // Update display
+                updateNowPlaying(firstSong);
+                updateUpNext();
+                
+                // Update vinyl label with album art
+                vinylLabel.innerHTML = '';
+                if (firstSong.picture) {
+                    const croppedCanvas = await cropTransparentPixels(firstSong.picture);
+                    if (croppedCanvas) {
+                        vinylLabel.appendChild(croppedCanvas);
+                    } else {
+                        vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                    }
+                } else {
+                    vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                }
+                
+                // Set audio source but don't play yet
+                audio.src = firstSong.file;
+                
+                // Start preloading next songs
+                preloadNextSongs(0);
+            } catch (error) {
+                console.error('Error loading first song:', error);
+            }
         }
 
         // Update now playing display
@@ -878,44 +984,95 @@
             setTimeout(() => upNext.classList.remove('fade-in'), 500);
         }
 
-        // Load song
-        async function loadSong(index) {
+        // Load song with vinyl switching animation
+        async function loadSong(index, withAnimation = false) {
             currentPlaylistIndex = index;
             
             // Load metadata if not already loaded
             const song = await loadSongMetadata(index);
             
-            audio.src = song.file;
-            updateNowPlaying(song);
-            updateUpNext();
-            
-            // Update vinyl label
-            vinylLabel.innerHTML = '';
-            
-            if (song.picture) {
-                const croppedCanvas = await cropTransparentPixels(song.picture);
+            // Function to update vinyl content
+            const updateVinylContent = async () => {
+                vinylLabel.innerHTML = '';
                 
-                if (croppedCanvas) {
-                    vinylLabel.appendChild(croppedCanvas);
+                if (song.picture) {
+                    const croppedCanvas = await cropTransparentPixels(song.picture);
+                    
+                    if (croppedCanvas) {
+                        vinylLabel.appendChild(croppedCanvas);
+                    } else {
+                        vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                    }
                 } else {
                     vinylLabel.innerHTML = '<div class="song-number">♪</div>';
                 }
+            };
+            
+            // If animation is requested, play vinyl switch animation
+            if (withAnimation) {
+                isTransitioning = true;
+                
+                // Stop spinning and start slide out animation
+                vinyl.classList.remove('spinning', 'slowing-down');
+                vinyl.classList.add('sliding-out');
+                
+                // Wait for slide out animation to complete
+                await new Promise(resolve => setTimeout(resolve, 600));
+                
+                // Update content while vinyl is off-screen
+                await updateVinylContent();
+                updateNowPlaying(song);
+                updateUpNext();
+                
+                // Use preloaded audio if available
+                if (preloadedAudioElements[song.file]) {
+                    audio.src = song.file;
+                    // Transfer current time if needed
+                } else {
+                    audio.src = song.file;
+                }
+                
+                // Start slide in animation
+                vinyl.classList.remove('sliding-out');
+                vinyl.classList.add('sliding-in');
+                
+                // Wait for slide in animation to complete
+                await new Promise(resolve => setTimeout(resolve, 600));
+                
+                // Remove animation class and resume spinning if playing
+                vinyl.classList.remove('sliding-in');
+                if (isPlaying) {
+                    vinyl.classList.add('spinning');
+                }
+                
+                isTransitioning = false;
             } else {
-                vinylLabel.innerHTML = '<div class="song-number">♪</div>';
+                // No animation - instant update
+                await updateVinylContent();
+                updateNowPlaying(song);
+                updateUpNext();
+                
+                // Use preloaded audio if available
+                if (preloadedAudioElements[song.file]) {
+                    audio.src = song.file;
+                } else {
+                    audio.src = song.file;
+                }
             }
             
             if (isPlaying) {
                 audio.play();
             }
             
-            // Preload metadata for next song in background
-            const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
-            loadSongMetadata(nextIndex).catch(err => console.error('Error preloading next song:', err));
+            // Preload next 5 songs in background
+            preloadNextSongs(currentPlaylistIndex);
         }
 
         // Toggle play/pause with gradual vinyl slowdown
         function togglePlayPause(e) {
             e.stopPropagation();
+            if (isTransitioning) return; // Prevent interaction during transition
+            
             if (isPlaying) {
                 // Pause with slowdown effect
                 audio.pause();
@@ -928,10 +1085,7 @@
                     vinyl.classList.remove('slowing-down');
                 }, 2000);
             } else {
-                // Play
-                if (!audio.src) {
-                    loadSong(0);
-                }
+                // Play - audio source already set in init
                 audio.play();
                 vinyl.classList.remove('slowing-down');
                 vinyl.classList.add('spinning');
@@ -940,13 +1094,12 @@
             isPlaying = !isPlaying;
         }
 
-        // Skip to next
-        function skipToNext() {
+        // Skip to next with vinyl switching animation
+        async function skipToNext() {
+            if (isTransitioning) return; // Prevent skipping during transition
+            
             currentPlaylistIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
-            loadSong(currentPlaylistIndex);
-            if (isPlaying) {
-                audio.play();
-            }
+            await loadSong(currentPlaylistIndex, true); // true = with animation
         }
 
         // Start loading songs
