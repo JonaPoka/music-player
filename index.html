@@ -735,7 +735,7 @@
             });
         }
 
-        // Load songs from songs.json
+        // Load songs from songs.json with lazy metadata loading
         async function loadSongsFromJSON() {
             try {
                 const response = await fetch('songs.json');
@@ -747,25 +747,19 @@
                     throw new Error('No songs found in songs.json');
                 }
                 
+                // Create lightweight song objects with just file path
                 for (const songFile of data.songs) {
                     const songPath = `songs/${encodeURIComponent(songFile)}`;
-                    const metadata = await extractMetadata(songPath);
-                    
-                    const tempAudio = new Audio(songPath);
-                    await new Promise((resolve) => {
-                        tempAudio.addEventListener('loadedmetadata', () => {
-                            metadata.duration = tempAudio.duration;
-                            resolve();
-                        });
-                        tempAudio.addEventListener('error', () => {
-                            console.error('Error loading audio:', songFile);
-                            resolve();
-                        });
-                    });
+                    const fileName = songFile.replace(/\.[^/.]+$/, "").replace(/%20/g, " ");
                     
                     songs.push({
                         file: songPath,
-                        ...metadata
+                        title: fileName,
+                        artist: 'Loading...',
+                        album: '',
+                        duration: 0,
+                        picture: null,
+                        metadataLoaded: false
                     });
                 }
                 
@@ -778,6 +772,49 @@
             } catch (error) {
                 console.error('Error loading songs:', error);
                 nowPlaying.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Load metadata for a specific song on-demand
+        async function loadSongMetadata(songIndex) {
+            const song = shuffledPlaylist[songIndex];
+            
+            // Skip if already loaded
+            if (song.metadataLoaded) {
+                return song;
+            }
+            
+            try {
+                // Extract metadata from file
+                const metadata = await extractMetadata(song.file);
+                
+                // Get duration
+                const tempAudio = new Audio(song.file);
+                await new Promise((resolve) => {
+                    tempAudio.addEventListener('loadedmetadata', () => {
+                        metadata.duration = tempAudio.duration;
+                        resolve();
+                    });
+                    tempAudio.addEventListener('error', () => {
+                        console.error('Error loading audio duration:', song.file);
+                        resolve();
+                    });
+                });
+                
+                // Update the song object with metadata
+                song.title = metadata.title;
+                song.artist = metadata.artist;
+                song.album = metadata.album;
+                song.duration = metadata.duration;
+                song.picture = metadata.picture;
+                song.metadataLoaded = true;
+                
+                return song;
+            } catch (error) {
+                console.error('Error loading metadata for:', song.file, error);
+                // Mark as loaded even on error to avoid repeated attempts
+                song.metadataLoaded = true;
+                return song;
             }
         }
 
@@ -808,15 +845,35 @@
         }
 
         // Update up next display
-        function updateUpNext() {
+        async function updateUpNext() {
             const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
             const nextSong = shuffledPlaylist[nextIndex];
             
-            upNext.innerHTML = `
-                <div class="up-next-label">Up Next</div>
-                <div class="up-next-info">${nextSong.title}</div>
-                <div class="up-next-artist">${nextSong.artist}</div>
-            `;
+            // Load metadata for next song if not already loaded
+            if (!nextSong.metadataLoaded) {
+                // Show placeholder while loading
+                upNext.innerHTML = `
+                    <div class="up-next-label">Up Next</div>
+                    <div class="up-next-info">${nextSong.title}</div>
+                    <div class="up-next-artist">Loading...</div>
+                `;
+                
+                // Load metadata in background and update display
+                loadSongMetadata(nextIndex).then(() => {
+                    upNext.innerHTML = `
+                        <div class="up-next-label">Up Next</div>
+                        <div class="up-next-info">${nextSong.title}</div>
+                        <div class="up-next-artist">${nextSong.artist}</div>
+                    `;
+                }).catch(err => console.error('Error loading next song metadata:', err));
+            } else {
+                upNext.innerHTML = `
+                    <div class="up-next-label">Up Next</div>
+                    <div class="up-next-info">${nextSong.title}</div>
+                    <div class="up-next-artist">${nextSong.artist}</div>
+                `;
+            }
+            
             upNext.classList.add('fade-in');
             setTimeout(() => upNext.classList.remove('fade-in'), 500);
         }
@@ -824,7 +881,9 @@
         // Load song
         async function loadSong(index) {
             currentPlaylistIndex = index;
-            const song = shuffledPlaylist[index];
+            
+            // Load metadata if not already loaded
+            const song = await loadSongMetadata(index);
             
             audio.src = song.file;
             updateNowPlaying(song);
@@ -848,6 +907,10 @@
             if (isPlaying) {
                 audio.play();
             }
+            
+            // Preload metadata for next song in background
+            const nextIndex = (currentPlaylistIndex + 1) % shuffledPlaylist.length;
+            loadSongMetadata(nextIndex).catch(err => console.error('Error preloading next song:', err));
         }
 
         // Toggle play/pause with gradual vinyl slowdown
